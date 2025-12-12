@@ -123,15 +123,24 @@ namespace rtosim {
 
         IKSequencer ikSequencer(ikOutputQueue, timeSequenceQueue, outputGeneralisedCoordinateQueue_, internalDoneWithSubscriptions, internalDoneWithexecution, nThreads_);
 
-        thread jobCreatorThr(ref(jobCreator));
-        thread ikSequencerThr(ref(ikSequencer));
-        vector<thread> ikSolversThrs;
-        for (auto& it : ikSolvers)
-            ikSolversThrs.emplace_back(ref(*it));
+		thread jobCreatorThr(ref(jobCreator));
+		thread ikSequencerThr(ref(ikSequencer));
+		vector<thread> ikSolversThrs;
+		for (auto& it : ikSolvers)
+			ikSolversThrs.emplace_back(ref(*it));
 
-        internalDoneWithSubscriptions.wait();
-        doneWithSubscriptions_.wait();
-        std::cout << "starting IK" << std::endl;
+		// Trigger latch for internal sync
+		std::cerr << "[QueueToInverseKinematics] Waiting on internalDoneWithSubscriptions..." << std::endl;
+		internalDoneWithSubscriptions.wait();
+		std::cerr << "[QueueToInverseKinematics] Internal doneWithSubscriptions passed!" << std::endl;
+
+		std::cerr << "[QueueToInverseKinematics] Waiting on external doneWithSubscriptions..." << std::endl;
+		doneWithSubscriptions_.wait();
+		std::cerr << "[QueueToInverseKinematics] External doneWithSubscriptions passed!" << std::endl;
+
+
+
+
 
         jobCreatorThr.join();
         ikSequencerThr.join();

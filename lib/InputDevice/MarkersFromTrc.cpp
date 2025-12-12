@@ -63,18 +63,28 @@ namespace rtosim {
         rtosim::ArrayConverter::toStdVector(trcFile.getMarkerNames(), markerNamesFromFile);
 
         rtosim::Mapper markersMapper(markerNamesFromFile, markerNamesFromModel);
-
-        for (size_t i(0); i < static_cast<size_t>(trcFile.getNumFrames()); ++i) {
-            auto markersFromTrcArr(trcFile.getFrame(i).getMarkers());
-            MarkerSetData markersFromTrc;
-            for (unsigned j(0); j < markersFromTrcArr.size(); ++j)
-                markersFromTrc.push_back(markersFromTrcArr[j]);
-
-            MarkerSetFrame currentFrame;
-            currentFrame.time = trcFile.getFrame(i).getFrameTime();
-            currentFrame.data = markersMapper.map(markersFromTrc);
-            frames_.push_back(currentFrame);
+// After rtosim::Mapper markersMapper...
+        if (markerNamesFromFile.size() != markerNamesFromModel.size()) {
+            std::cerr << "WARNING: Number of markers in TRC (" << markerNamesFromFile.size()
+                      << ") does not match model markers (" << markerNamesFromModel.size() << ")." << std::endl;
+            for (const auto& name : markerNamesFromFile)
+                std::cerr << "TRC Marker: " << name << std::endl;
+            for (const auto& name : markerNamesFromModel)
+                std::cerr << "Model Marker: " << name << std::endl;
         }
+
+	for (size_t i(0); i < static_cast<size_t>(trcFile.getNumFrames()); ++i) {
+	    auto markersFromTrcArr(trcFile.getFrame(i).getMarkers());
+	    MarkerSetData markersFromTrc;
+	    for (unsigned j(0); j < markersFromTrcArr.size(); ++j)
+		markersFromTrc.push_back(markersFromTrcArr[j]);
+
+	    MarkerSetFrame currentFrame;
+	    currentFrame.time = trcFile.getFrame(i).getFrameTime();
+	    std::cerr << "[MarkersFromTrc] Frame #" << i << " Time: " << currentFrame.time << std::endl;  // ADD THIS LINE
+	    currentFrame.data = markersMapper.map(markersFromTrc);
+	    frames_.push_back(currentFrame);
+	}
     }
 
     void MarkersFromTrc::setOutputFrequency(double frequency) {
@@ -92,37 +102,40 @@ namespace rtosim {
         framesToSkip_ = n;
     }
 
-    void MarkersFromTrc::operator()(){
-        const std::chrono::milliseconds sleepTimeMilliseconds(getSleepTime());
-        unsigned skipped(0);
-//        unsigned count(0);
+	void MarkersFromTrc::operator()() {
+		std::cerr << "[MarkersFromTrc] Waiting on doneWithSubscriptions latch..." << std::endl;
+		doneWithSubscriptions_.wait();
+		std::cerr << "[MarkersFromTrc] doneWithSubscriptions passed! Starting to push markers." << std::endl;
 
-        size_t noFrames(frames_.size());
-        if (noFrames > 0)
-            noMarkers_ = frames_.front().data.size();
-        doneWithSubscriptions_.wait();
+		const std::chrono::milliseconds sleepTimeMilliseconds(getSleepTime());
+		unsigned skipped(0);
 
-        std::chrono::steady_clock::time_point timeOutTime = std::chrono::steady_clock::now();
-        //todo, fix shared variables
-        do {
-            for(auto& frame : frames_) {
-                if (speedFactor_ > 0) {
-                    timeOutTime += sleepTimeMilliseconds;
-                    std::this_thread::sleep_until(timeOutTime);
-                }
-                if (skipped == framesToSkip_) {
-                    outputMarkerSetQueue_.push(frame);
-                    skipped = 0;
-                }
-                else
-                    ++skipped;
-            }
+		size_t noFrames(frames_.size());
+		if (noFrames > 0)
+		    noMarkers_ = frames_.front().data.size();
 
-        } while(loop_);
-        sendEndOfData();
-        doneWithExecution_.wait();
+		std::chrono::steady_clock::time_point timeOutTime = std::chrono::steady_clock::now();
 
-    }
+		do {
+		    for (auto& frame : frames_) {
+		        if (speedFactor_ > 0) {
+		            timeOutTime += sleepTimeMilliseconds;
+		            std::this_thread::sleep_until(timeOutTime);
+		        }
+		        if (skipped == framesToSkip_) {
+		            outputMarkerSetQueue_.push(frame);
+		            skipped = 0;
+		        } else {
+		            ++skipped;
+		        }
+		    }
+
+		} while (loop_);
+
+		sendEndOfData();
+		doneWithExecution_.wait();
+	}
+
 
     std::chrono::milliseconds MarkersFromTrc::getSleepTime() const {
 

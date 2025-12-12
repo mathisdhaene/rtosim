@@ -24,16 +24,13 @@ using std::string;
 #include <Simbody.h>
 
 void printAuthors() {
-
     cout << "Real-time OpenSim inverse kinematics" << endl;
     cout << "Authors: Claudio Pizzolato <c.pizzolato@griffith.edu.au>" << endl;
     cout << "         Monica Reggiani <monica.reggiani@unipd.it>" << endl << endl;
 }
 
 void printHelp() {
-
     printAuthors();
-
     auto progName(SimTK::Pathname::getThisExecutablePath());
     bool isAbsolute;
     string dir, filename, ext;
@@ -55,6 +52,12 @@ void printHelp() {
 
 int main(int argc, char* argv[]) {
 
+    // DEBUG: Print arguments
+    std::cout << "DEBUG: Argument Count: " << argc << std::endl;
+    for (int i = 0; i < argc; ++i) {
+        std::cout << "DEBUG: Arg[" << i << "]: " << argv[i] << std::endl;
+    }
+
     ProgramOptionsParser po(argc, argv);
     if (po.exists("-h") || po.empty()) {
         printHelp();
@@ -68,6 +71,7 @@ int main(int argc, char* argv[]) {
         printHelp();
         exit(EXIT_SUCCESS);
     }
+    std::cout << "DEBUG: Loaded model file: " << osimModelFilename << std::endl;
 
     string trcTrialFilename;
     if (po.exists("--trc"))
@@ -76,6 +80,7 @@ int main(int argc, char* argv[]) {
         printHelp();
         exit(EXIT_SUCCESS);
     }
+    std::cout << "DEBUG: Loaded TRC file: " << trcTrialFilename << std::endl;
 
     string ikTaskFilename;
     if (po.exists("--task-set"))
@@ -84,151 +89,91 @@ int main(int argc, char* argv[]) {
         printHelp();
         exit(EXIT_SUCCESS);
     }
+    std::cout << "DEBUG: Loaded IK Task Set: " << ikTaskFilename << std::endl;
 
     double fc(8);
     if (po.exists("--fc"))
         fc = po.getParameter<double>("--fc");
+    std::cout << "DEBUG: Filter Cutoff Frequency: " << fc << std::endl;
 
     unsigned nThreads(1);
     if (po.exists("-j"))
         nThreads = po.getParameter<unsigned>("-j");
+    std::cout << "DEBUG: Number of IK Threads: " << nThreads << std::endl;
 
     double solverAccuracy(1e-5);
     if (po.exists("-a"))
-        nThreads = po.getParameter<double>("-a");
+        solverAccuracy = po.getParameter<double>("-a");
+    std::cout << "DEBUG: Solver Accuracy: " << solverAccuracy << std::endl;
 
     string resultDir("Output");
     if (po.exists("--output"))
         resultDir = po.getParameter("--output");
+    std::cout << "DEBUG: Output Directory: " << resultDir << std::endl;
 
     double pushFrequency(-1);
     if (po.exists("--push-frequency"))
         pushFrequency = po.getParameter<double>("--push-frequency");
+    std::cout << "DEBUG: Push Frequency: " << pushFrequency << std::endl;
 
     bool showVisualiser(false);
     if (po.exists("-v"))
         showVisualiser = true;
+    std::cout << "DEBUG: Visualiser Enabled: " << showVisualiser << std::endl;
 
     resultDir = rtosim::FileSystem::getAbsolutePath(resultDir);
     rtosim::FileSystem::createDirectory(resultDir);
     string stopWatchResultDir(resultDir);
 
-    //define the shared buffer
+    // DEBUG: Queues and Barriers
+    std::cout << "DEBUG: Setting up queues and synchronization barriers..." << std::endl;
+
     rtosim::MarkerSetQueue markerSetQueue;
     rtosim::GeneralisedCoordinatesQueue generalisedCoordinatesQueue, filteredGeneralisedCoordinatesQueue;
 
-    //define the barriers
     rtb::Concurrency::Latch doneWithSubscriptions;
     rtb::Concurrency::Latch doneWithExecution;
 
-    //define the filter
     auto coordNames = getCoordinateNamesFromModel(osimModelFilename);
     rtosim::GeneralisedCoordinatesStateSpace gcFilt(fc, coordNames.size());
 
-    //define the threads
-    //#read markers from file and save them in markerSetQueue
-    rtosim::MarkersFromTrc markersFromTrc(
-        markerSetQueue,
-        doneWithSubscriptions,
-        doneWithExecution,
-        osimModelFilename,
-        trcTrialFilename,
-        false);
+    // DEBUG: Setting up threads...
+    std::cout << "DEBUG: Setting up threads..." << std::endl;
 
+    rtosim::MarkersFromTrc markersFromTrc(markerSetQueue, doneWithSubscriptions, doneWithExecution, osimModelFilename, trcTrialFilename, false);
     markersFromTrc.setOutputFrequency(pushFrequency);
 
-    //read from markerSetQueue, calculate IK, and save results in generalisedCoordinatesQueue
-    rtosim::QueueToInverseKinematics inverseKinematics(
-        markerSetQueue,
-        generalisedCoordinatesQueue,
-        doneWithSubscriptions,
-        doneWithExecution,
-        osimModelFilename,
-        nThreads, ikTaskFilename, solverAccuracy);
+    rtosim::QueueToInverseKinematics inverseKinematics(markerSetQueue, generalisedCoordinatesQueue, doneWithSubscriptions, doneWithExecution, osimModelFilename, nThreads, ikTaskFilename, solverAccuracy);
 
-    //read from generalisedCoordinatesQueue, filter using gcFilt,
-    //and save filtered data in filteredGeneralisedCoordinatesQueue
-    rtosim::QueueAdapter <
-        rtosim::GeneralisedCoordinatesQueue,
-        rtosim::GeneralisedCoordinatesQueue,
-        rtosim::GeneralisedCoordinatesStateSpace
-    > gcQueueAdaptor(
-    generalisedCoordinatesQueue,
-    filteredGeneralisedCoordinatesQueue,
-    doneWithSubscriptions,
-    doneWithExecution,
-    gcFilt);
+    rtosim::QueueAdapter<rtosim::GeneralisedCoordinatesQueue, rtosim::GeneralisedCoordinatesQueue, rtosim::GeneralisedCoordinatesStateSpace>
+    gcQueueAdaptor(generalisedCoordinatesQueue, filteredGeneralisedCoordinatesQueue, doneWithSubscriptions, doneWithExecution, gcFilt);
 
-    //read from filteredGeneralisedCoordinatesQueue and save to file
-    rtosim::QueueToFileLogger<rtosim::GeneralisedCoordinatesData> filteredIkLogger(
-        filteredGeneralisedCoordinatesQueue,
-        doneWithSubscriptions,
-        doneWithExecution,
-        getCoordinateNamesFromModel(osimModelFilename),
-        resultDir, "filtered_ik_from_file", "sto");
+    rtosim::QueueToFileLogger<rtosim::GeneralisedCoordinatesData> filteredIkLogger(filteredGeneralisedCoordinatesQueue, doneWithSubscriptions, doneWithExecution, coordNames, resultDir, "filtered_ik_from_file", "sto");
 
-    //read from generalisedCoordinatesQueue and save to file
-    rtosim::QueueToFileLogger<rtosim::GeneralisedCoordinatesData> rawIkLogger(
-        generalisedCoordinatesQueue,
-        doneWithSubscriptions,
-        doneWithExecution,
-        getCoordinateNamesFromModel(osimModelFilename),
-        resultDir, "raw_ik_from_file", "sto");
+    rtosim::QueueToFileLogger<rtosim::GeneralisedCoordinatesData> rawIkLogger(generalisedCoordinatesQueue, doneWithSubscriptions, doneWithExecution, coordNames, resultDir, "raw_ik_from_file", "sto");
 
-    //calculate the ik throughput time
-    rtosim::FrameCounter<rtosim::GeneralisedCoordinatesQueue> ikFrameCounter(
-        generalisedCoordinatesQueue,
-        "time-ik-throughput");
+    rtosim::FrameCounter<rtosim::GeneralisedCoordinatesQueue> ikFrameCounter(generalisedCoordinatesQueue, "time-ik-throughput");
 
-    //measures the time that takes every single frame to appear in two different queues
-    rtosim::TimeDifference<
-        rtosim::GeneralisedCoordinatesQueue,
-        rtosim::GeneralisedCoordinatesQueue> gcQueueAdaptorTimeDifference(
-        generalisedCoordinatesQueue,
-        filteredGeneralisedCoordinatesQueue,
-        doneWithSubscriptions,
-        doneWithExecution);
+    rtosim::TimeDifference<rtosim::GeneralisedCoordinatesQueue, rtosim::GeneralisedCoordinatesQueue>
+    gcQueueAdaptorTimeDifference(generalisedCoordinatesQueue, filteredGeneralisedCoordinatesQueue, doneWithSubscriptions, doneWithExecution);
 
-    rtosim::TimeDifference<
-        rtosim::MarkerSetQueue,
-        rtosim::GeneralisedCoordinatesQueue> ikTimeDifference(
-        markerSetQueue,
-        generalisedCoordinatesQueue,
-        doneWithSubscriptions,
-        doneWithExecution);
+    rtosim::TimeDifference<rtosim::MarkerSetQueue, rtosim::GeneralisedCoordinatesQueue>
+    ikTimeDifference(markerSetQueue, generalisedCoordinatesQueue, doneWithSubscriptions, doneWithExecution);
 
     doneWithSubscriptions.setCount(7);
     doneWithExecution.setCount(7);
 
-    //launch, execute, and join all the threads
-    //all the multithreading is in this function
+    // DEBUG: Launching threads
+    std::cout << "DEBUG: About to launch threads, visualiser = " << showVisualiser << std::endl;
+
     if (showVisualiser) {
         rtosim::StateVisualiser visualiser(generalisedCoordinatesQueue, osimModelFilename);
-        rtosim::QueuesSync::launchThreads(
-            markersFromTrc,
-            inverseKinematics,
-            gcQueueAdaptor,
-            filteredIkLogger,
-            gcQueueAdaptorTimeDifference,
-            ikTimeDifference,
-            rawIkLogger,
-            ikFrameCounter,
-            visualiser
-            );
+        rtosim::QueuesSync::launchThreads(markersFromTrc, inverseKinematics, gcQueueAdaptor, filteredIkLogger, gcQueueAdaptorTimeDifference, ikTimeDifference, rawIkLogger, ikFrameCounter, visualiser);
+    } else {
+        rtosim::QueuesSync::launchThreads(markersFromTrc, inverseKinematics, gcQueueAdaptor, filteredIkLogger, gcQueueAdaptorTimeDifference, ikTimeDifference, rawIkLogger, ikFrameCounter);
     }
-    else {
-        rtosim::QueuesSync::launchThreads(
-            markersFromTrc,
-            inverseKinematics,
-            gcQueueAdaptor,
-            filteredIkLogger,
-            gcQueueAdaptorTimeDifference,
-            ikTimeDifference,
-            rawIkLogger,
-            ikFrameCounter
-            );
-    }
-    //multithreaded part is over, all threads are joined
+
+    std::cout << "DEBUG: Threads completed, post-processing..." << std::endl;
 
     auto stopWatches = inverseKinematics.getProcessingTimes();
     rtosim::StopWatch combinedSW("time-ikparallel-processing");
@@ -238,5 +183,7 @@ int main(int argc, char* argv[]) {
     ikFrameCounter.getProcessingTimes().print(stopWatchResultDir);
     ikTimeDifference.getWallClockDifference().print(stopWatchResultDir + "/time-markerqueue-to-jointangles.txt");
     gcQueueAdaptorTimeDifference.getWallClockDifference().print(stopWatchResultDir + "/time-jointangles-to-filteredjointangles.txt");
+
+    std::cout << "DEBUG: Program completed successfully." << std::endl;
     return 0;
 }

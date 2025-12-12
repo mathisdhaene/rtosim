@@ -42,10 +42,14 @@ namespace rtosim {
         noIkThreads_(noIkThreads) {}
 
     void JobsCreator::operator()(){
-
+		std::cerr << "[JobsCreator] Started successfully!" << std::endl;
         bool localRunCondition(true);
         inputMarkerQueue_.subscribe();
-        doneWithSubscriptions_.wait();
+		std::cerr << "[JobsCreator] Waiting on internalDoneWithSubscriptions..." << std::endl;
+		doneWithSubscriptions_.wait();
+		std::cerr << "[JobsCreator] internalDoneWithSubscriptions passed!" << std::endl;
+
+
         while (localRunCondition)  {
             MarkerSetFrame currentFrame = inputMarkerQueue_.pop();
             if (rtosim::EndOfData::isEod(currentFrame)) {

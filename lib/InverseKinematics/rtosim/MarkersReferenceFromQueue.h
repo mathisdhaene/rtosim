@@ -35,9 +35,10 @@ namespace rtosim{
         virtual void getValues(const SimTK::State &s, SimTK::Array_<SimTK::Vec3> &values) const;
         virtual void getWeights(const SimTK::State &s, SimTK::Array_<double> &weights) const override;
         virtual const SimTK::Array_<std::string>& getNames() const override;
-        double getCurrentTime() { return time_; }
+        double getCurrentTime() const { return time_; }
         bool isEndOfData() const;
         void purgeCurrentFrame();
+        void setMarkerIsOccluded(int index, bool occluded);
     private:
         ThreadPoolJobs<MarkerSetFrame>& inputMarkerSetFrameQueue_;
         MarkerSetFrame getPastFrame(double time) const;

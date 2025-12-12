@@ -42,28 +42,44 @@ namespace rtosim{
         return rtosim::EndOfData::isEod(frame);
     }
 
-    void MarkersReferenceFromQueue::purgeCurrentFrame() {
-        inputMarkerSetFrameQueue_.pop();
-        lastQueueTime_ = -std::numeric_limits<double>::infinity();
-    }
+	void MarkersReferenceFromQueue::purgeCurrentFrame() {
+		MarkerSetFrame frame = inputMarkerSetFrameQueue_.pop();  // ✅ Retire le frame courant
+		lastQueueTime_ = time_;  // Met à jour le dernier temps utilisé
 
-    void MarkersReferenceFromQueue::getValues(const SimTK::State &s, SimTK::Array_<SimTK::Vec3> &values) const {
+		// ⚠️ On suppose que la queue a encore des frames. Sinon, time_ devient infini.
+		try {
+		    time_ = inputMarkerSetFrameQueue_.front().time;  // On regarde juste le prochain time
+		}
+		catch (...) {
+		    // Si jamais on ne peut pas accéder à front(), on met time_ à infini pour indiquer la fin.
+		    time_ = std::numeric_limits<double>::infinity();  
+		}
 
-        values.clear();
-        MarkerSetFrame frame;
-        double currentTime(inputMarkerSetFrameQueue_.front().time);
-        if (currentTime < lastQueueTime_)
-            frame = getPastFrame(currentTime);
-        else
-            frame = getFrameFromQueue();
+		std::cerr << "[MarkersReferenceFromQueue] Purged frame, next time_: " << time_ << std::endl;
+	}
 
-        if (rtosim::EndOfData::isEod(frame))
-            for (auto& m : frame.data)
-                m.setOccluded(true);
-        for (auto& marker : frame.data)
-            values.push_back(marker.getCoordinates());
-        time_ = frame.time;
-    }
+
+	void MarkersReferenceFromQueue::getValues(const SimTK::State &s, SimTK::Array_<SimTK::Vec3> &values) const {
+		values.clear();
+		MarkerSetFrame frame;
+		double currentTime(inputMarkerSetFrameQueue_.front().time);
+		if (currentTime < lastQueueTime_)
+		    frame = getPastFrame(currentTime);
+		else
+		    frame = getFrameFromQueue();
+
+		if (rtosim::EndOfData::isEod(frame))
+		    for (auto& m : frame.data)
+		        m.setOccluded(true);
+		for (auto& marker : frame.data)
+		    values.push_back(marker.getCoordinates());
+
+		time_ = frame.time;
+
+		std::cerr << "[MarkersReferenceFromQueue] Updated time_: " << time_ << std::endl;
+	}
+
+
 
     MarkerSetFrame MarkersReferenceFromQueue::getPastFrame(double time) const {
 
@@ -93,4 +109,13 @@ namespace rtosim{
 
         weights = markerWeigths_;
     }
+	void MarkersReferenceFromQueue::setMarkerIsOccluded(int index, bool occluded) {
+		if (!pastFrames_.empty()) {
+		    MarkerSetFrame& lastFrame = pastFrames_.back();  // Récupère le frame en cours
+		    if (index >= 0 && index < static_cast<int>(lastFrame.data.size())) {
+		        lastFrame.data[index].setOccluded(occluded);
+		    }
+    }
+}
+
 }

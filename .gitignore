@@ -8,3 +8,12 @@ tmp/
 # IDE stuff
 .idea
 .vs
+
+
+# Editor swap files
+*.swp
+*.swo
+*~
+
+# Logs
+*.log

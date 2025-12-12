@@ -44,7 +44,10 @@ namespace rtosim{
     void IKSequencer::operator()(){
 
         bool localRunCondition(true);
-        doneWithSubscriptions_.wait();
+		std::cerr << "[IKSequencer] Waiting on internalDoneWithSubscriptions..." << std::endl;
+		doneWithSubscriptions_.wait();
+		std::cerr << "[IKSequencer] internalDoneWithSubscriptions passed!" << std::endl;
+
 
         while (localRunCondition) {
             double nextTime = inputTimeSequence_.pop();

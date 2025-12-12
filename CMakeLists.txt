@@ -18,6 +18,8 @@ project(RTOSIM CXX)
 set(RTOSIM_MAJOR_VERSION 1)
 set(RTOSIM_MINOR_VERSION 0)
 set(RTOSIM_PATCH_VERSION 0)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 #include GNUInstallDirs to get canonical paths
 include(GNUInstallDirs)
@@ -37,6 +39,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
 find_package(Concurrency REQUIRED)
 find_package(Filter REQUIRED)
+include_directories(${CMAKE_SOURCE_DIR}/Dependencies/Filter/install/include)
 find_package(OpenSim REQUIRED)
 find_package(ViconSDK QUIET)
 if(${VICONSDK_FOUND})

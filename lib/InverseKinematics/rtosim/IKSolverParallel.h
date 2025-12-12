@@ -26,7 +26,16 @@
 
 #include <string>
 #include <map>
-#include <OpenSim/OpenSim.h>
+#include <OpenSim/Simulation/Model/Model.h>
+#include <OpenSim/Simulation/InverseKinematicsSolver.h>
+#include <OpenSim/Simulation/MarkersReference.h>
+#include <OpenSim/Common/Set.h>
+#include <OpenSim/Common/TimeSeriesTable.h>
+#include <OpenSim/Tools/IKTaskSet.h>
+
+//#include <OpenSim/OpenSim.h>
+
+
 
 namespace rtosim{
 
