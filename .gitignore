@@ -1,19 +1,50 @@
-# Build output
+# -------------------------
+# Build / install artifacts
+# -------------------------
 build/
+build-*/
+cmake-build-*/
 Debug/
 Release/
-cmake-build-*/
-tmp/
+install/
+Dependencies/
 
-# IDE stuff
-.idea
-.vs
+# -------------------------
+# CMake generated files
+# -------------------------
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+CTestTestfile.cmake
+Testing/
+*.cmake.user
+*.cmake
 
+# -------------------------
+# Compiled artifacts
+# -------------------------
+*.o
+*.obj
+*.a
+*.so
+*.so.*
+*.dylib
+*.dll
+*.exe
 
-# Editor swap files
+# -------------------------
+# IDE / editor
+# -------------------------
+.idea/
+.vs/
+.vscode/
 *.swp
 *.swo
 *~
 
-# Logs
+# -------------------------
+# Logs / misc
+# -------------------------
 *.log
+tmp/
