@@ -29,6 +29,7 @@
 #include <OpenSim/Simulation/Model/Model.h>
 #include <OpenSim/Simulation/InverseKinematicsSolver.h>
 #include <OpenSim/Simulation/MarkersReference.h>
+#include <OpenSim/Simulation/CoordinateReference.h>
 #include <OpenSim/Common/Set.h>
 #include <OpenSim/Common/TimeSeriesTable.h>
 #include <OpenSim/Tools/IKTaskSet.h>
@@ -55,6 +56,7 @@ namespace rtosim{
             );
         void setInverseKinematicsTaskSet(const std::string& ikTaskSetFilename);
         void setInverseKinematicsTaskSet(const OpenSim::IKTaskSet& ikTaskSet);
+        void setParityMode(bool enabled) { parityMode_ = enabled; }
         virtual ~IKSolverParallel();
         void operator()();
         StopWatch getProcessingTimes() const { return stopWatch_; }
@@ -71,6 +73,14 @@ namespace rtosim{
         std::vector<std::string> markerNames_, coordinateNames_;
         unsigned nMarkers_, nCoordinates_;
         std::map<std::string, double> markerWeights_;
+        struct CoordinateTaskConfig {
+            std::string name;
+            double weight = 0.0;
+            int valueType = 0; // OpenSim::IKCoordinateTask::ValueType
+            double value = 0.0;
+        };
+        std::vector<CoordinateTaskConfig> coordinateTaskConfigs_;
+        bool parityMode_ = false;
         rtosim::GeneralisedCoordinatesData defaultPose_;
         double sovlerAccuracy_;
         double contraintWeight_;

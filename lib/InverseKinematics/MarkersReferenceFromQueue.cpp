@@ -95,7 +95,7 @@ namespace rtosim{
 
         lastQueueTime_ = frame.time;
         pastFrames_.push_back(frame);
-        if (pastFrames_.size() < MaxFramesToStore)
+        if (pastFrames_.size() > MaxFramesToStore)
             pastFrames_.pop_front();
         return frame;
     }
