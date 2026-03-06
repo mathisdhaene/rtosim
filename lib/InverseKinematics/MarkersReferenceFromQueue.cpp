@@ -68,11 +68,25 @@ namespace rtosim{
 		else
 		    frame = getFrameFromQueue();
 
-		if (rtosim::EndOfData::isEod(frame))
-		    for (auto& m : frame.data)
-		        m.setOccluded(true);
+		if (rtosim::EndOfData::isEod(frame)) {
+		    // Avoid returning an empty marker array at end-of-stream, which can
+		    // trigger crashes in some OpenSim/RTOSIM parity-track paths.
+		    const int n = markerNames_.size();
+		    for (int i = 0; i < n; ++i) {
+		        values.push_back(SimTK::Vec3(0));
+		    }
+		    time_ = frame.time;
+		    return;
+		}
+
 		for (auto& marker : frame.data)
 		    values.push_back(marker.getCoordinates());
+
+		// Defensive padding/truncation to keep a stable marker count.
+		while (values.size() < markerNames_.size())
+		    values.push_back(SimTK::Vec3(0));
+		while (values.size() > markerNames_.size())
+		    values.pop_back();
 
 		time_ = frame.time;
 
@@ -81,13 +95,19 @@ namespace rtosim{
 
 
 
-    MarkerSetFrame MarkersReferenceFromQueue::getPastFrame(double time) const {
+	    MarkerSetFrame MarkersReferenceFromQueue::getPastFrame(double time) const {
+        if (pastFrames_.empty()) {
+            return MarkerSetFrame();
+        }
 
-        auto it(std::lower_bound(pastFrames_.begin(), pastFrames_.end(), time, [](
-            MarkerSetFrame& lhs,
-            double t){ return lhs.time < t; }));
-        return *it;
-    }
+	        auto it(std::lower_bound(pastFrames_.begin(), pastFrames_.end(), time, [](
+	            MarkerSetFrame& lhs,
+	            double t){ return lhs.time < t; }));
+        if (it == pastFrames_.end()) {
+            return pastFrames_.back();
+        }
+	        return *it;
+	    }
 
     MarkerSetFrame MarkersReferenceFromQueue::getFrameFromQueue() const {
 

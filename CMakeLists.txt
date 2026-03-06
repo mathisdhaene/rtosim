@@ -39,7 +39,14 @@ set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
 find_package(Concurrency REQUIRED)
 find_package(Filter REQUIRED)
-include_directories(${CMAKE_SOURCE_DIR}/Dependencies/Filter/install/include)
+# Use include dirs exported by the discovered Filter package.
+# The previous hardcoded path only works for one specific tree layout.
+if(TARGET rtb::Filter)
+    get_target_property(_RTB_FILTER_INCLUDE_DIRS rtb::Filter INTERFACE_INCLUDE_DIRECTORIES)
+    if(_RTB_FILTER_INCLUDE_DIRS)
+        include_directories(${_RTB_FILTER_INCLUDE_DIRS})
+    endif()
+endif()
 find_package(OpenSim REQUIRED)
 find_package(ViconSDK QUIET)
 if(${VICONSDK_FOUND})
